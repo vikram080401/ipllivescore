@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: ipllivescore
+    env: java
+    buildCommand: mvn clean package
+    startCommand: java -jar target/*.jar
