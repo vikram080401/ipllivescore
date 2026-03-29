@@ -59,22 +59,53 @@ public class CricketService {
 
                     String score = "Match not started";
 
+//                    if (matchScore != null) {
+//
+//                        StringBuilder scoreBuilder = new StringBuilder();
+//
+//                        if (matchScore.has("team1Score")) {
+//                            JsonNode t1 = matchScore.get("team1Score").get("inngs1");
+//
+//                            int runs = t1.has("runs") ? t1.get("runs").asInt() : 0;
+//                            int wickets = t1.has("wickets") ? t1.get("wickets").asInt() : 0;
+//                            String overs = t1.has("overs") ? t1.get("overs").asText() : "0";
+//
+//                            scoreBuilder.append(runs).append("/").append(wickets)
+//                                    .append(" (").append(overs).append(")");
+//                        }
+//
+//                        score = scoreBuilder.toString();
+//                    }
+
                     if (matchScore != null) {
 
-                        StringBuilder scoreBuilder = new StringBuilder();
+                        String team1Score = "";
+                        String team2Score = "";
 
+                        // 🔹 Team 1
                         if (matchScore.has("team1Score")) {
                             JsonNode t1 = matchScore.get("team1Score").get("inngs1");
 
-                            int runs = t1.has("runs") ? t1.get("runs").asInt() : 0;
-                            int wickets = t1.has("wickets") ? t1.get("wickets").asInt() : 0;
-                            String overs = t1.has("overs") ? t1.get("overs").asText() : "0";
-
-                            scoreBuilder.append(runs).append("/").append(wickets)
-                                    .append(" (").append(overs).append(")");
+                            team1Score = t1.get("runs").asInt() + "/" +
+                                    t1.get("wickets").asInt() + " (" +
+                                    t1.get("overs").asText() + ")";
                         }
 
-                        score = scoreBuilder.toString();
+                        // 🔹 Team 2
+                        if (matchScore.has("team2Score")) {
+                            JsonNode t2 = matchScore.get("team2Score").get("inngs1");
+
+                            team2Score = t2.get("runs").asInt() + "/" +
+                                    t2.get("wickets").asInt() + " (" +
+                                    t2.get("overs").asText() + ")";
+                        }
+
+                        // ✅ Combine nicely
+                        if (!team2Score.isEmpty()) {
+                            score = team1 + ": " + team1Score + " | " + team2 + ": " + team2Score;
+                        } else {
+                            score = team1 + ": " + team1Score;
+                        }
                     }
 
                     return new MatchResponse(
