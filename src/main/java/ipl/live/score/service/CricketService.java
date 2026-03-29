@@ -19,10 +19,9 @@ public class CricketService {
     public MatchResponse getLiveScore() throws Exception {
 
         String response = apiClient.fetchLiveMatches();
-        System.out.println(response);
-        JsonNode root = objectMapper.readTree(response);
+        System.out.println(response); // 🔥 remove after testing
 
-        // Cricbuzz structure
+        JsonNode root = objectMapper.readTree(response);
         JsonNode typeMatches = root.get("typeMatches");
 
         if (typeMatches == null) {
@@ -32,13 +31,11 @@ public class CricketService {
         for (JsonNode typeMatch : typeMatches) {
 
             JsonNode seriesMatches = typeMatch.get("seriesMatches");
-
             if (seriesMatches == null) continue;
 
             for (JsonNode seriesWrapper : seriesMatches) {
 
                 JsonNode series = seriesWrapper.get("seriesAdWrapper");
-
                 if (series == null) continue;
 
                 String seriesName = series.get("seriesName").asText().toLowerCase();
@@ -49,6 +46,7 @@ public class CricketService {
                 }
 
                 JsonNode matches = series.get("matches");
+                if (matches == null) continue;
 
                 for (JsonNode matchWrapper : matches) {
 
@@ -60,14 +58,24 @@ public class CricketService {
 
                     String status = matchInfo.get("status").asText();
 
-                    String score = "-";
+                    String score = "Match not started";
 
-                    if (matchScore != null && matchScore.has("team1Score")) {
-                        JsonNode t1 = matchScore.get("team1Score").get("inngs1");
+                    if (matchScore != null) {
 
-                        score = t1.get("runs").asInt() + "/" +
-                                t1.get("wickets").asInt() + " (" +
-                                t1.get("overs").asText() + ")";
+                        StringBuilder scoreBuilder = new StringBuilder();
+
+                        if (matchScore.has("team1Score")) {
+                            JsonNode t1 = matchScore.get("team1Score").get("inngs1");
+
+                            int runs = t1.has("runs") ? t1.get("runs").asInt() : 0;
+                            int wickets = t1.has("wickets") ? t1.get("wickets").asInt() : 0;
+                            String overs = t1.has("overs") ? t1.get("overs").asText() : "0";
+
+                            scoreBuilder.append(runs).append("/").append(wickets)
+                                    .append(" (").append(overs).append(")");
+                        }
+
+                        score = scoreBuilder.toString();
                     }
 
                     return new MatchResponse(
