@@ -15,108 +15,73 @@ public class CricketService {
     private final CricketApiClient apiClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    @Cacheable("liveScore")
     public MatchResponse getLiveScore() throws Exception {
 
         String response = apiClient.fetchLiveMatches();
-        System.out.println(response); // 🔥 remove after testing
+        System.out.println(response); // debug
 
         JsonNode root = objectMapper.readTree(response);
-        JsonNode typeMatches = root.get("typeMatches");
+        JsonNode matches = root.get("data");
 
-        if (typeMatches == null) {
-            return new MatchResponse("No IPL Match", "-", "-");
+        if (matches == null || matches.size() == 0) {
+            return new MatchResponse("No Match Available", "-", "-");
         }
 
-        for (JsonNode typeMatch : typeMatches) {
+        JsonNode fallbackMatch = null;
 
-            JsonNode seriesMatches = typeMatch.get("seriesMatches");
-            if (seriesMatches == null) continue;
+        for (JsonNode match : matches) {
 
-            for (JsonNode seriesWrapper : seriesMatches) {
+            boolean started = match.get("matchStarted").asBoolean();
+            boolean ended = match.get("matchEnded").asBoolean();
 
-                JsonNode series = seriesWrapper.get("seriesAdWrapper");
-                if (series == null) continue;
+            // ✅ PRIORITY 1 → LIVE MATCH
+            if (started && !ended) {
+                return buildResponse(match);
+            }
 
-                String seriesName = series.get("seriesName").asText().toLowerCase();
-
-                // 🔥 IPL filter
-                if (!seriesName.contains("indian premier league")) {
-                    continue;
-                }
-
-                JsonNode matches = series.get("matches");
-                if (matches == null) continue;
-
-                for (JsonNode matchWrapper : matches) {
-
-                    JsonNode matchInfo = matchWrapper.get("matchInfo");
-                    JsonNode matchScore = matchWrapper.get("matchScore");
-
-                    String team1 = matchInfo.get("team1").get("teamName").asText();
-                    String team2 = matchInfo.get("team2").get("teamName").asText();
-
-                    String status = matchInfo.get("status").asText();
-
-                    String score = "Match not started";
-
-//                    if (matchScore != null) {
-//
-//                        StringBuilder scoreBuilder = new StringBuilder();
-//
-//                        if (matchScore.has("team1Score")) {
-//                            JsonNode t1 = matchScore.get("team1Score").get("inngs1");
-//
-//                            int runs = t1.has("runs") ? t1.get("runs").asInt() : 0;
-//                            int wickets = t1.has("wickets") ? t1.get("wickets").asInt() : 0;
-//                            String overs = t1.has("overs") ? t1.get("overs").asText() : "0";
-//
-//                            scoreBuilder.append(runs).append("/").append(wickets)
-//                                    .append(" (").append(overs).append(")");
-//                        }
-//
-//                        score = scoreBuilder.toString();
-//                    }
-
-                    if (matchScore != null) {
-
-                        String team1Score = "";
-                        String team2Score = "";
-
-                        // 🔹 Team 1
-                        if (matchScore.has("team1Score")) {
-                            JsonNode t1 = matchScore.get("team1Score").get("inngs1");
-
-                            team1Score = t1.get("runs").asInt() + "/" +
-                                    t1.get("wickets").asInt() + " (" +
-                                    t1.get("overs").asText() + ")";
-                        }
-
-                        // 🔹 Team 2
-                        if (matchScore.has("team2Score")) {
-                            JsonNode t2 = matchScore.get("team2Score").get("inngs1");
-
-                            team2Score = t2.get("runs").asInt() + "/" +
-                                    t2.get("wickets").asInt() + " (" +
-                                    t2.get("overs").asText() + ")";
-                        }
-
-                        // ✅ Combine nicely
-                        if (!team2Score.isEmpty()) {
-                            score = team1 + ": " + team1Score + " | " + team2 + ": " + team2Score;
-                        } else {
-                            score = team1 + ": " + team1Score;
-                        }
-                    }
-
-                    return new MatchResponse(
-                            team1 + " vs " + team2,
-                            status,
-                            score
-                    );
-                }
+            // ✅ PRIORITY 2 → RECENT / UPCOMING
+            if (fallbackMatch == null) {
+                fallbackMatch = match;
             }
         }
 
-        return new MatchResponse("No IPL Match", "-", "-");
+        // ✅ If no live match, return fallback
+        return buildResponse(fallbackMatch);
+    }
+
+    // 🔥 Helper method
+    private MatchResponse buildResponse(JsonNode match) {
+
+        JsonNode teams = match.get("teams");
+
+        String team1 = teams.get(0).asText();
+        String team2 = teams.get(1).asText();
+
+        String matchName = team1 + " vs " + team2;
+        String status = match.get("status").asText();
+
+        String score = "Match not started";
+
+        JsonNode scores = match.get("score");
+
+        if (scores != null && scores.size() > 0) {
+
+            // 👉 Show BOTH innings if available
+            StringBuilder scoreBuilder = new StringBuilder();
+
+            for (JsonNode inning : scores) {
+                scoreBuilder.append(inning.get("inning").asText())
+                        .append(": ")
+                        .append(inning.get("r").asInt()).append("/")
+                        .append(inning.get("w").asInt())
+                        .append(" (").append(inning.get("o").asDouble()).append(")")
+                        .append(" | ");
+            }
+
+            score = scoreBuilder.toString();
+        }
+
+        return new MatchResponse(matchName, status, score);
     }
 }
