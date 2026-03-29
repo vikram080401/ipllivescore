@@ -8,6 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class CricketService {
@@ -16,41 +19,53 @@ public class CricketService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Cacheable("liveScore")
-    public MatchResponse getLiveScore() throws Exception {
+    public List<MatchResponse> getLiveScore() throws Exception {
 
         String response = apiClient.fetchLiveMatches();
-        System.out.println(response); // debug
+        System.out.println(response);
 
         JsonNode root = objectMapper.readTree(response);
         JsonNode matches = root.get("data");
 
-        if (matches == null || matches.size() == 0) {
-            return new MatchResponse("No Match Available", "-", "-");
+        List<MatchResponse> result = new ArrayList<>();
+
+        if (matches == null) {
+            return List.of(new MatchResponse("No Match", "-", "-"));
         }
 
-        JsonNode fallbackMatch = null;
+        List<JsonNode> liveMatches = new ArrayList<>();
+        List<JsonNode> upcomingMatches = new ArrayList<>();
+        List<JsonNode> recentMatches = new ArrayList<>();
 
         for (JsonNode match : matches) {
 
             boolean started = match.get("matchStarted").asBoolean();
             boolean ended = match.get("matchEnded").asBoolean();
 
-            // ✅ PRIORITY 1 → LIVE MATCH
             if (started && !ended) {
-                return buildResponse(match);
-            }
-
-            // ✅ PRIORITY 2 → RECENT / UPCOMING
-            if (fallbackMatch == null) {
-                fallbackMatch = match;
+                liveMatches.add(match);
+            } else if (!started) {
+                upcomingMatches.add(match);
+            } else {
+                recentMatches.add(match);
             }
         }
 
-        // ✅ If no live match, return fallback
-        return buildResponse(fallbackMatch);
+        // ✅ Priority: LIVE → UPCOMING → RECENT
+        addMatches(result, liveMatches, 3);
+        if (result.size() < 3) addMatches(result, upcomingMatches, 3 - result.size());
+        if (result.size() < 3) addMatches(result, recentMatches, 3 - result.size());
+
+        return result;
     }
 
-    // 🔥 Helper method
+    private void addMatches(List<MatchResponse> result, List<JsonNode> matches, int limit) {
+        for (JsonNode match : matches) {
+            if (result.size() >= 3) break;
+            result.add(buildResponse(match));
+        }
+    }
+
     private MatchResponse buildResponse(JsonNode match) {
 
         JsonNode teams = match.get("teams");
@@ -67,7 +82,6 @@ public class CricketService {
 
         if (scores != null && scores.size() > 0) {
 
-            // 👉 Show BOTH innings if available
             StringBuilder scoreBuilder = new StringBuilder();
 
             for (JsonNode inning : scores) {
