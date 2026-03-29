@@ -19,75 +19,66 @@ public class CricketService {
     public MatchResponse getLiveScore() throws Exception {
 
         String response = apiClient.fetchLiveMatches();
-
+        System.out.println(response);
         JsonNode root = objectMapper.readTree(response);
-        JsonNode matches = root.get("data");
 
-        MatchResponse upcomingMatch = null;
-        String upcomingMatchTime = null;
+        // Cricbuzz structure
+        JsonNode typeMatches = root.get("typeMatches");
 
-        for (JsonNode match : matches) {
+        if (typeMatches == null) {
+            return new MatchResponse("No IPL Match", "-", "-");
+        }
 
-            // ✅ 🔥 BEST IPL FILTER (series name based)
-            boolean isIplMatch = match.get("name")
-                    .asText()
-                    .toLowerCase()
-                    .contains("indian premier league");
+        for (JsonNode typeMatch : typeMatches) {
 
-            if (!isIplMatch) continue;
+            JsonNode seriesMatches = typeMatch.get("seriesMatches");
 
-            boolean started = match.get("matchStarted").asBoolean();
-            boolean ended = match.get("matchEnded").asBoolean();
+            if (seriesMatches == null) continue;
 
-            // ✅ 1. LIVE match
-            if (started && !ended) {
-                return buildResponse(match);
-            }
+            for (JsonNode seriesWrapper : seriesMatches) {
 
-            // ✅ 2. UPCOMING match (pick earliest)
-            if (!started) {
-                String matchTime = match.get("dateTimeGMT").asText();
+                JsonNode series = seriesWrapper.get("seriesAdWrapper");
 
-                if (upcomingMatch == null || upcomingMatchTime == null ||
-                        matchTime.compareTo(upcomingMatchTime) < 0) {
+                if (series == null) continue;
 
-                    upcomingMatch = buildResponse(match);
-                    upcomingMatchTime = matchTime;
+                String seriesName = series.get("seriesName").asText().toLowerCase();
+
+                // 🔥 IPL filter
+                if (!seriesName.contains("indian premier league")) {
+                    continue;
+                }
+
+                JsonNode matches = series.get("matches");
+
+                for (JsonNode matchWrapper : matches) {
+
+                    JsonNode matchInfo = matchWrapper.get("matchInfo");
+                    JsonNode matchScore = matchWrapper.get("matchScore");
+
+                    String team1 = matchInfo.get("team1").get("teamName").asText();
+                    String team2 = matchInfo.get("team2").get("teamName").asText();
+
+                    String status = matchInfo.get("status").asText();
+
+                    String score = "-";
+
+                    if (matchScore != null && matchScore.has("team1Score")) {
+                        JsonNode t1 = matchScore.get("team1Score").get("inngs1");
+
+                        score = t1.get("runs").asInt() + "/" +
+                                t1.get("wickets").asInt() + " (" +
+                                t1.get("overs").asText() + ")";
+                    }
+
+                    return new MatchResponse(
+                            team1 + " vs " + team2,
+                            status,
+                            score
+                    );
                 }
             }
         }
 
-        // ✅ Return upcoming if no live
-        if (upcomingMatch != null) {
-            return upcomingMatch;
-        }
-
         return new MatchResponse("No IPL Match", "-", "-");
-    }
-
-    // 🔥 Helper method
-    private MatchResponse buildResponse(JsonNode match) {
-
-        JsonNode teams = match.get("teams");
-
-        String team1 = teams.get(0).asText();
-        String team2 = teams.get(1).asText();
-
-        String matchName = team1 + " vs " + team2;
-        String status = match.get("status").asText();
-
-        String score = "-";
-
-        JsonNode scores = match.get("score");
-
-        if (scores != null && scores.size() > 0) {
-            JsonNode lastInning = scores.get(scores.size() - 1);
-
-            score = lastInning.get("r").asInt() + "/" +
-                    lastInning.get("w").asInt() + " (" +
-                    lastInning.get("o").asDouble() + ")";
-        }
-
-        return new MatchResponse(matchName, status, score);
     }
 }
