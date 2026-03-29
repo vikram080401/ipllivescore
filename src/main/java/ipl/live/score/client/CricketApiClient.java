@@ -17,7 +17,6 @@ public class CricketApiClient implements CricketClient {
 
     private static final String URL =
             "https://cricbuzz-cricket.p.rapidapi.com/matches/v1/live";
-
     public String fetchLiveMatches() {
         System.out.println("Calling RapidAPI...");
         HttpHeaders headers = new HttpHeaders();

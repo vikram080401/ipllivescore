@@ -15,7 +15,6 @@ public class CricketService {
     private final CricketApiClient apiClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-
     public MatchResponse getLiveScore() throws Exception {
 
         String response = apiClient.fetchLiveMatches();
