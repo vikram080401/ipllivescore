@@ -10,6 +10,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/cricket")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "https://abhinavkumarvikram.co.in")
 public class CricketController {
 
     private final CricketService cricketService;
