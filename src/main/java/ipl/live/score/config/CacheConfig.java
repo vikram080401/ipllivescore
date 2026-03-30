@@ -18,7 +18,8 @@ public class CacheConfig {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager("liveScore");
         cacheManager.setCaffeine(
                 Caffeine.newBuilder()
-                        .expireAfterWrite(30, TimeUnit.SECONDS)
+                        .expireAfterWrite(16, TimeUnit.MINUTES) // 🔥 16 mins TTL
+                        .maximumSize(100)
         );
         return cacheManager;
     }
